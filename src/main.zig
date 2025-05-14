@@ -8,14 +8,6 @@ const zm = @import("zm");
 const std = @import("std");
 const shaders = @import("shaders.zig");
 
-// const c = @cImport({
-//     @cDefine("SDL_DISABLE_OLD_NAMES", {});
-//     @cInclude("SDL3/SDL.h");
-//     @cInclude("SDL3/SDL_revision.h");
-//     @cDefine("SDL_MAIN_HANDLED", {}); // We are providing our own entry point
-//     @cInclude("SDL3/SDL_main.h");
-// });
-
 // constants and structs
 var procs: gl.ProcTable = undefined;
 const WindowSize = struct {
@@ -60,7 +52,50 @@ pub fn main() !void {
     // define the callback function when the framebuffer has a rezise
     _ = glfw.Window.setFramebufferSizeCallback(window, framebuffer_size_callback);
 
+    // Yay! Finally I have reach to something that relates to the superbible,
+    // the shaders!!!
+
+    // variables for verifications
+    var success: c_int = undefined;
+    var infoLog: [512]u8 = [_]u8{0} ** 512;
+
+    // Creating, loading and compiling the vectex shader:
+    var vetexShader: c_uint = undefined;
+    vetexShader = gl.CreateShader(gl.VERTEX_SHADER);
+    defer gl.DeleteShader(vetexShader);
+
+    const vertexShaderPtr = @as([*]const [*]const u8, @ptrCast(&shaders.vertexShaderImpl));
+    var length: [1]c_int = [_]c_int{0};
+    gl.ShaderSource(vetexShader, 1, vertexShaderPtr, &length);
+    gl.CompileShader(vetexShader);
+
+    // verification for the vertex shader:
+    gl.GetShaderiv(vetexShader, gl.COMPILE_STATUS, &success);
+
+    if (success == 0) {
+        gl.GetShaderInfoLog(vetexShader, 512, &length[0], &infoLog);
+        std.log.err("{s}", .{infoLog});
+    }
+
+    // Creating, loading and compiling the vectex shader:
+    var fragmentShader: c_uint = undefined;
+    fragmentShader = gl.CreateShader(gl.FRAGMENT_SHADER);
+    defer gl.DeleteShader(fragmentShader);
+
+    const fragmentShaderPtr = @as([*]const [*]const u8, @ptrCast(&shaders.fragmentShaderImpl));
+    gl.ShaderSource(fragmentShader, 1, fragmentShaderPtr, &length);
+    gl.CompileShader(fragmentShader);
+
+    // verify for the fragment shader
+    gl.GetShaderiv(fragmentShader, gl.COMPILE_STATUS, &success);
+
+    if (success == 0) {
+        gl.GetShaderInfoLog(fragmentShader, 512, &length[0], &infoLog);
+        std.log.err("{s}", .{infoLog});
+    }
+
     // here is the main event loop to stay the window alive
+    // and the rendering take place in this loop
     while (!glfw.windowShouldClose(window)) {
         glfw.swapBuffers(window);
         glfw.pollEvents();
@@ -73,9 +108,6 @@ pub fn main() !void {
 // we have to ditch all the variable using '_' to comply the zig rules on unused variables.
 fn framebuffer_size_callback(window: *glfw.Window, width: c_int, height: c_int) callconv(.c) void {
     _ = window;
-
-    std.debug.print("width: {d}\nheight: {d}", .{ width, height });
-
     // Viewport used for mapping the screen resolution into a range between -1 and 1
     // Superbible: page 94
     gl.Viewport(0, 0, width, height);

@@ -3,3 +3,4 @@
 /libs
 zig-out
 zig-out/bin/learn_opengl.exe
+zig-out/bin/learn_opengl.pdb

@@ -52,15 +52,6 @@ pub fn build(b: *std.Build) void {
     });
     exe_mod.addImport("gl", gl_bindings);
 
-    // SDL dependency:
-    const sdl_dep = b.dependency("sdl", .{
-        .target = target,
-        .optimize = optimize,
-    });
-
-    const sdl_lib = sdl_dep.artifact("SDL3");
-    exe_mod.linkLibrary(sdl_lib);
-
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default
     // step when running `zig build`).
