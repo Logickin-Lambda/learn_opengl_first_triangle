@@ -57,24 +57,28 @@ pub fn main() !void {
 
     // variables for verifications
     var success: c_int = undefined;
-    var infoLog: [512]u8 = [_]u8{0} ** 512;
+    var infoLog: [512:0]u8 = undefined;
 
     // Creating, loading and compiling the vectex shader:
-    var vetexShader: c_uint = undefined;
-    vetexShader = gl.CreateShader(gl.VERTEX_SHADER);
-    defer gl.DeleteShader(vetexShader);
+    var vertexShader: c_uint = undefined;
+    vertexShader = gl.CreateShader(gl.VERTEX_SHADER);
+    defer gl.DeleteShader(vertexShader);
 
-    const vertexShaderPtr = @as([*]const [*]const u8, @ptrCast(&shaders.vertexShaderImpl));
-    var length: [1]c_int = [_]c_int{0};
-    gl.ShaderSource(vetexShader, 1, vertexShaderPtr, &length);
-    gl.CompileShader(vetexShader);
+    gl.ShaderSource(
+        vertexShader,
+        1,
+        &.{shaders.vertexShaderImpl},
+        &.{shaders.vertexShaderImpl.len},
+    );
+    gl.CompileShader(vertexShader);
 
-    // verification for the vertex shader:
-    gl.GetShaderiv(vetexShader, gl.COMPILE_STATUS, &success);
+    // verify vertex shader
+    gl.GetShaderiv(vertexShader, gl.COMPILE_STATUS, &success);
 
-    if (success == 0) {
-        gl.GetShaderInfoLog(vetexShader, 512, &length[0], &infoLog);
-        std.log.err("{s}", .{infoLog});
+    if (success == gl.FALSE) {
+        gl.GetShaderInfoLog(vertexShader, infoLog.len, null, &infoLog);
+        std.log.err("{s}", .{std.mem.sliceTo(&infoLog, 0)});
+        return error.CompileVertexShaderFailed;
     }
 
     // Creating, loading and compiling the vectex shader:
@@ -82,21 +86,62 @@ pub fn main() !void {
     fragmentShader = gl.CreateShader(gl.FRAGMENT_SHADER);
     defer gl.DeleteShader(fragmentShader);
 
-    const fragmentShaderPtr = @as([*]const [*]const u8, @ptrCast(&shaders.fragmentShaderImpl));
-    gl.ShaderSource(fragmentShader, 1, fragmentShaderPtr, &length);
+    gl.ShaderSource(
+        fragmentShader,
+        1,
+        &.{shaders.fragmentShaderImpl},
+        &.{shaders.fragmentShaderImpl.len},
+    );
     gl.CompileShader(fragmentShader);
 
-    // verify for the fragment shader
+    // verify fragment shader
     gl.GetShaderiv(fragmentShader, gl.COMPILE_STATUS, &success);
 
-    if (success == 0) {
-        gl.GetShaderInfoLog(fragmentShader, 512, &length[0], &infoLog);
-        std.log.err("{s}", .{infoLog});
+    if (success == gl.FALSE) {
+        gl.GetShaderInfoLog(fragmentShader, infoLog.len, null, &infoLog);
+        std.log.err("{s}", .{std.mem.sliceTo(&infoLog, 0)});
+        return error.CompileFragmentShaderFailed;
     }
+
+    // create a program and load all the shaders
+    var shaderProgram: c_uint = undefined;
+    shaderProgram = gl.CreateProgram();
+    if (shaderProgram == gl.FALSE) {
+        return error.ProgramCreationFailed;
+    }
+    errdefer gl.DeleteProgram(shaderProgram);
+
+    gl.AttachShader(shaderProgram, vertexShader);
+    gl.AttachShader(shaderProgram, fragmentShader);
+    gl.LinkProgram(shaderProgram);
+
+    // // verify the linkage of shaders
+    gl.GetProgramiv(shaderProgram, gl.LINK_STATUS, &success);
+
+    if (success == gl.FALSE) {
+        gl.GetProgramInfoLog(fragmentShader, infoLog.len, null, &infoLog);
+        std.log.err("{s}", .{infoLog});
+        return error.LinkProgramFailed;
+    }
+
+    // define the vao, but since this code is based on the first triangle program of the opengl superbible 7
+    // there is nothing in the vao
+    var vao: c_uint = undefined;
+    gl.GenVertexArrays(1, (&vao)[0..1]);
+    errdefer gl.DeleteVertexArrays(1, (&vao)[0..1]);
+
+    gl.BindVertexArray(vao);
+    defer gl.BindVertexArray(0);
 
     // here is the main event loop to stay the window alive
     // and the rendering take place in this loop
     while (!glfw.windowShouldClose(window)) {
+        const green: [4]gl.float = .{ 0.0, 0.25, 0.0, 1.0 };
+        gl.ClearBufferfv(gl.COLOR, 0, &green);
+
+        gl.UseProgram(shaderProgram);
+        gl.DrawArrays(gl.TRIANGLES, 0, 3);
+
         glfw.swapBuffers(window);
         glfw.pollEvents();
     }
