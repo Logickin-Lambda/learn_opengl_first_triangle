@@ -1,3 +1,5 @@
 /.vscode
 /.zig-cache
 /libs
+zig-out
+zig-out/bin/learn_opengl.exe
